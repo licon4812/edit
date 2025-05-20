@@ -219,7 +219,34 @@ pub fn draw_handle_wants_close(ctx: &mut Context, state: &mut State) {
         Discard,
         Cancel,
     }
+
+    // Track which button is selected: 0 = Save, 1 = Don't Save, 2 = Cancel
+    static mut SELECTED_BUTTON: u8 = 0;
+    let mut selected = unsafe { SELECTED_BUTTON };
+    let button_count = 3;
     let mut action = Action::None;
+
+    // Handle arrow key navigation
+    if let Some(key) = ctx.keyboard_input() {
+        match key {
+            vk::LEFT => {
+                if selected == 0 {
+                    selected = button_count - 1;
+                } else {
+                    selected -= 1;
+                }
+                ctx.set_input_consumed();
+                ctx.input_keyboard = None; // Clear keyboard input to prevent lingering highlight
+            }
+            vk::RIGHT => {
+                selected = (selected + 1) % button_count;
+                ctx.set_input_consumed();
+                ctx.input_keyboard = None; // Clear keyboard input to prevent lingering highlight
+            }
+            _ => {}
+        }
+        unsafe { SELECTED_BUTTON = selected; }
+    }
 
     ctx.modal_begin("unsaved-changes", loc(LocId::UnsavedChangesDialogTitle));
     ctx.attr_background_rgba(ctx.indexed(IndexedColor::Red));
@@ -237,22 +264,57 @@ pub fn draw_handle_wants_close(ctx: &mut Context, state: &mut State) {
             ctx.table_next_row();
             ctx.inherit_focus();
 
-            if ctx.button("yes", loc(LocId::UnsavedChangesDialogYes)) {
-                action = Action::Save;
+            let mut button_activated = None;
+            // Save button
+            if selected == 0 {
+                ctx.attr_reverse();
+                let save_pressed = ctx.button("save", loc(LocId::UnsavedChangesDialogYes)) || (ctx.input_keyboard == Some(vk::RETURN));
+                ctx.attr_reverse();
+                if save_pressed {
+                    button_activated = Some(Action::Save);
+                }
+            } else {
+                let save_pressed = ctx.button("save", loc(LocId::UnsavedChangesDialogYes));
+                if save_pressed {
+                    button_activated = Some(Action::Save);
+                }
             }
-            ctx.inherit_focus();
-            if ctx.button("no", loc(LocId::UnsavedChangesDialogNo)) {
-                action = Action::Discard;
+            // No button
+            if selected == 1 {
+                ctx.attr_reverse();
+                let no_pressed = ctx.button("no", loc(LocId::UnsavedChangesDialogNo)) || (ctx.input_keyboard == Some(vk::RETURN));
+                ctx.attr_reverse();
+                if no_pressed {
+                    button_activated = Some(Action::Discard);
+                }
+            } else {
+                let no_pressed = ctx.button("no", loc(LocId::UnsavedChangesDialogNo));
+                if no_pressed {
+                    button_activated = Some(Action::Discard);
+                }
             }
-            if ctx.button("cancel", loc(LocId::Cancel)) {
-                action = Action::Cancel;
+            // Cancel button
+            if selected == 2 {
+                ctx.attr_reverse();
+                let cancel_pressed = ctx.button("cancel", loc(LocId::Cancel)) || (ctx.input_keyboard == Some(vk::RETURN));
+                ctx.attr_reverse();
+                if cancel_pressed {
+                    button_activated = Some(Action::Cancel);
+                }
+            } else {
+                let cancel_pressed = ctx.button("cancel", loc(LocId::Cancel));
+                if cancel_pressed {
+                    button_activated = Some(Action::Cancel);
+                }
             }
-
-            // TODO: This should highlight the corresponding letter in the label.
+            // Shortcuts
             if ctx.consume_shortcut(vk::S) {
-                action = Action::Save;
+                button_activated = Some(Action::Save);
             } else if ctx.consume_shortcut(vk::N) {
-                action = Action::Discard;
+                button_activated = Some(Action::Discard);
+            }
+            if let Some(act) = button_activated {
+                action = act;
             }
         }
         ctx.table_end();

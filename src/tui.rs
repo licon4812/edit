@@ -1366,7 +1366,7 @@ pub struct Context<'a, 'input> {
     /// Current text input, if any.
     input_text: Option<InputText<'input>>,
     /// Current keyboard input, if any.
-    input_keyboard: Option<InputKey>,
+    pub input_keyboard: Option<InputKey>,
     input_mouse_modifiers: InputKeyMod,
     input_mouse_click: CoordType,
     /// By how much the mouse wheel was scrolled since the last frame.
